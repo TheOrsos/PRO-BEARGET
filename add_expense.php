@@ -35,6 +35,30 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             throw new Exception("Accesso non autorizzato o utente pagante non valido.");
         }
 
+        // --- ATTACHMENT HANDLING ---
+        $attachment_path = null;
+        if (isset($_FILES['attachment_file']) && $_FILES['attachment_file']['error'] == 0) {
+            $target_dir = "uploads/attachments/";
+            if (!file_exists($target_dir)) {
+                mkdir($target_dir, 0755, true);
+            }
+            $file_extension = pathinfo($_FILES["attachment_file"]["name"], PATHINFO_EXTENSION);
+            $safe_filename = uniqid('attachment_', true) . '.' . $file_extension;
+            $attachment_path = $target_dir . $safe_filename;
+
+            $allowed_types = ['jpg', 'jpeg', 'png', 'pdf'];
+            if (!in_array(strtolower($file_extension), $allowed_types)) {
+                throw new Exception("Tipo di file non supportato.");
+            }
+            if ($_FILES["attachment_file"]["size"] > 2097152) { // 2MB
+                throw new Exception("Il file è troppo grande (max 2MB).");
+            }
+
+            if (!move_uploaded_file($_FILES["attachment_file"]["tmp_name"], $attachment_path)) {
+                throw new Exception("Errore durante il caricamento del file.");
+            }
+        }
+
         // --- SPLIT LOGIC ---
         $splits = [];
         $total_check = 0; // Per validare la somma finale
@@ -125,9 +149,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $stmt_personal_tx->close();
 
         // 3. Inserisci la spesa nel log del gruppo
-        $sql_expense = "INSERT INTO group_expenses (fund_id, paid_by_user_id, description, amount, expense_date, category_id, note_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        // ASSUMPTION: 'group_expenses' table has 'attachment_path' and 'transaction_id' columns.
+        $sql_get_tx_id = "SELECT id FROM transactions ORDER BY id DESC LIMIT 1";
+        $transaction_id = $conn->query($sql_get_tx_id)->fetch_assoc()['id'];
+
+        $sql_expense = "INSERT INTO group_expenses (fund_id, paid_by_user_id, description, amount, expense_date, category_id, note_id, attachment_path, transaction_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt_expense = $conn->prepare($sql_expense);
-        $stmt_expense->bind_param("iisdsii", $fund_id, $paid_by_user_id, $description, $amount, $expense_date, $category_id, $note_id);
+        $stmt_expense->bind_param("iisdsiisi", $fund_id, $paid_by_user_id, $description, $amount, $expense_date, $category_id, $note_id, $attachment_path, $transaction_id);
         $stmt_expense->execute();
         $expense_id = $stmt_expense->insert_id;
         $stmt_expense->close();

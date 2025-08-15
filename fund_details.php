@@ -270,7 +270,7 @@ if ($fund['status'] === 'settling' || $fund['status'] === 'settling_auto') {
                         <!-- Expense List -->
                          <div class="bg-gray-800 rounded-2xl p-6">
                             <h2 class="text-xl font-bold text-white mb-4">Spese del Gruppo</h2>
-                            <div class="space-y-2">
+                            <div id="group-expenses-list" class="space-y-2">
                                 <?php if(empty($group_expenses)): ?>
                                     <div class="text-center py-8 text-gray-500">
                                         <p>Nessuna spesa registrata in questo gruppo.</p>
@@ -289,13 +289,32 @@ if ($fund['status'] === 'settling' || $fund['status'] === 'settling_auto') {
                                             </p>
                                         </div>
                                     </div>
-                                    <div class="flex items-center gap-4">
-                                        <?php if($expense['note_id']): ?>
-                                        <a href="note_details.php?id=<?php echo $expense['note_id']; ?>" class="text-gray-400 hover:text-white" title="Visualizza nota">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                        </a>
-                                        <?php endif; ?>
-                                        <p class="font-bold text-danger text-lg">-€<?php echo number_format($expense['amount'], 2, ',', '.'); ?></p>
+                                    <div class="flex items-center gap-2">
+                                        <p class="font-bold text-danger text-lg w-24 text-right">-€<?php echo number_format($expense['amount'], 2, ',', '.'); ?></p>
+
+                                        <div class="flex items-center space-x-1">
+                                            <button onclick="openExpenseNoteModal(<?php echo $expense['id']; ?>)" title="Aggiungi/Modifica Nota" class="p-2 hover:bg-gray-700 rounded-full transition-colors">
+                                                <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                            </button>
+
+                                            <?php if (!empty($expense['attachment_path'])): ?>
+                                                <a href="<?php echo htmlspecialchars($expense['attachment_path']); ?>" target="_blank" title="Visualizza allegato" class="p-2 hover:bg-gray-700 rounded-full transition-colors">
+                                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                                                </a>
+                                            <?php endif; ?>
+
+                                            <button onclick='openEditExpenseModal(<?php echo json_encode($expense); ?>)' title="Modifica" class="p-2 hover:bg-gray-700 rounded-full transition-colors">
+                                                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.536L16.732 3.732z"></path></svg>
+                                            </button>
+
+                                            <form action="delete_expense.php" method="POST" class="delete-expense-form" style="display: inline;">
+                                                <input type="hidden" name="expense_id" value="<?php echo $expense['id']; ?>">
+                                                <input type="hidden" name="fund_id" value="<?php echo $fund_id; ?>">
+                                                <button type="submit" title="Elimina" class="p-2 hover:bg-gray-700 rounded-full transition-colors">
+                                                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                </button>
+                                            </form>
+                                        </div>
                                     </div>
                                 </div>
                                 <?php endforeach; endif; ?>
@@ -532,7 +551,93 @@ if ($fund['status'] === 'settling' || $fund['status'] === 'settling_auto') {
         </div>
     <?php endif; ?>
 
+    <!-- Modale Modifica Spesa -->
+    <div id="edit-expense-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+        <div class="fixed inset-0 bg-black bg-opacity-50 opacity-0 modal-backdrop" onclick="closeModal('edit-expense-modal')"></div>
+        <div class="bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg p-6 transform scale-95 opacity-0 modal-content">
+            <h2 class="text-2xl font-bold text-white mb-6">Modifica Spesa di Gruppo</h2>
+            <form id="edit-expense-form" action="update_expense.php" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="expense_id" id="edit-expense-id">
+                <input type="hidden" name="fund_id" value="<?php echo $fund_id; ?>">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Importo</label>
+                        <input type="number" step="0.01" name="amount" id="edit-expense-amount" required class="w-full bg-gray-700 text-white rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Data</label>
+                        <input type="date" name="expense_date" id="edit-expense-date" required class="w-full bg-gray-700 text-white rounded-lg px-3 py-2">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Descrizione</label>
+                        <input type="text" name="description" id="edit-expense-description" required class="w-full bg-gray-700 text-white rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Pagato da</label>
+                        <select name="paid_by_user_id" id="edit-paid-by" required class="w-full bg-gray-700 text-white rounded-lg px-3 py-2">
+                            <?php foreach($members as $member): ?>
+                                <option value="<?php echo $member['id']; ?>"><?php echo htmlspecialchars($member['username']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Categoria</label>
+                        <select name="category_id" id="edit-expense-category" required class="w-full bg-gray-700 text-white rounded-lg px-3 py-2">
+                            <?php foreach($expense_categories as $cat): ?>
+                                <option value="<?php echo $cat['id']; ?>"><?php echo htmlspecialchars($cat['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Allegato</label>
+                        <div id="attachment-management-area" class="space-y-2">
+                            <div id="current-attachment-container" class="hidden items-center justify-between bg-gray-700 p-2 rounded-lg">
+                                <a id="current-attachment-link" href="#" target="_blank" class="text-sm text-indigo-400 hover:underline truncate">Visualizza allegato corrente</a>
+                                <div class="flex items-center">
+                                    <input type="checkbox" name="delete_attachment" id="delete_attachment" class="h-4 w-4 rounded bg-gray-900 border-gray-600 text-primary-600 focus:ring-primary-500">
+                                    <label for="delete_attachment" class="ml-2 text-sm text-gray-400">Elimina</label>
+                                </div>
+                            </div>
+                            <input type="file" name="attachment_file" id="edit-attachment-file" accept=".pdf,.jpg,.jpeg,.png" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-600 file:text-white hover:file:bg-primary-700">
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8 flex justify-end space-x-4">
+                    <button type="button" onclick="closeModal('edit-expense-modal')" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-5 rounded-lg">Annulla</button>
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-5 rounded-lg">Salva Modifiche</button>
+                </div>
+            </form>
+        </div>
+    </div>
     <script>
+        function openEditExpenseModal(expense) {
+            document.getElementById('edit-expense-id').value = expense.id;
+            document.getElementById('edit-expense-description').value = expense.description;
+            document.getElementById('edit-expense-amount').value = expense.amount;
+            document.getElementById('edit-expense-date').value = expense.expense_date;
+            document.getElementById('edit-paid-by').value = expense.paid_by_user_id;
+            document.getElementById('edit-expense-category').value = expense.category_id;
+
+            const attachmentContainer = document.getElementById('current-attachment-container');
+            const attachmentLink = document.getElementById('current-attachment-link');
+            const deleteCheckbox = document.getElementById('delete_attachment');
+            const fileInput = document.getElementById('edit-attachment-file');
+
+            if (expense.attachment_path) {
+                attachmentLink.href = expense.attachment_path;
+                attachmentContainer.classList.remove('hidden');
+                attachmentContainer.classList.add('flex');
+            } else {
+                attachmentContainer.classList.add('hidden');
+                attachmentContainer.classList.remove('flex');
+            }
+
+            if(deleteCheckbox) deleteCheckbox.checked = false;
+            if(fileInput) fileInput.value = '';
+
+            openModal('edit-expense-modal');
+        }
+
         function openModal(modalId) {
             const modal = document.getElementById(modalId);
             if (!modal) return;
@@ -680,10 +785,173 @@ if ($fund['status'] === 'settling' || $fund['status'] === 'settling_auto') {
                         parent.innerHTML = `<p class="text-green-400 text-sm italic mt-2">Conto selezionato.</p>`;
                         // Optionally, check if all accounts are now selected and show the final button
                     } else {
-                        alert('Errore: ' + data.message);
+                        showToast('Errore: ' + data.message, 'error');
                     }
                 })
-                .catch(err => alert('Errore di rete.'));
+                .catch(err => showToast('Errore di rete.', 'error'));
+            }
+        });
+
+        // --- Delete Expense Logic ---
+        const expenseListContainer = document.getElementById('group-expenses-list');
+        const confirmDeleteExpenseBtn = document.getElementById('confirm-delete-expense-btn');
+        let expenseFormToDelete = null;
+
+        if(expenseListContainer) {
+            expenseListContainer.addEventListener('submit', function(e) {
+                const form = e.target.closest('.delete-expense-form');
+                if (form) {
+                    e.preventDefault();
+                    expenseFormToDelete = form;
+                    openModal('confirm-delete-expense-modal');
+                }
+            });
+        }
+
+        if(confirmDeleteExpenseBtn) {
+            confirmDeleteExpenseBtn.addEventListener('click', function() {
+                if (expenseFormToDelete) {
+                    const formData = new FormData(expenseFormToDelete);
+                    const expenseRow = expenseFormToDelete.closest('.flex.items-center.justify-between');
+
+                    fetch(expenseFormToDelete.action, { method: 'POST', body: formData })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                showToast(data.message);
+                                if(expenseRow) {
+                                   expenseRow.style.transition = 'opacity 0.5s ease-out';
+                                   expenseRow.style.opacity = '0';
+                                   setTimeout(() => {
+                                       expenseRow.remove();
+                                       if (expenseListContainer.children.length === 0) {
+                                            expenseListContainer.innerHTML = `<div class="text-center py-8 text-gray-500"><p>Nessuna spesa registrata in questo gruppo.</p></div>`;
+                                       }
+                                   }, 500);
+                                }
+                                // Reload to update balances, or implement a more complex JS update
+                                setTimeout(() => window.location.reload(), 1500);
+                            } else {
+                                showToast(data.message, 'error');
+                            }
+                        })
+                        .catch(err => showToast('Errore di rete.', 'error'))
+                        .finally(() => {
+                            closeModal('confirm-delete-expense-modal');
+                            expenseFormToDelete = null;
+                        });
+                }
+            });
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast-notification');
+            if (!toast) {
+                alert(message); // Fallback
+                return;
+            }
+            const toastMessage = document.getElementById('toast-message');
+            const toastIcon = document.getElementById('toast-icon');
+            toastMessage.textContent = message;
+
+            toast.classList.remove('bg-success', 'bg-danger', 'hidden', 'opacity-0');
+            toastIcon.innerHTML = '';
+
+            if (type === 'success') {
+                toast.classList.add('bg-success');
+                toastIcon.innerHTML = `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"></path></svg>`;
+            } else {
+                toast.classList.add('bg-danger');
+                toastIcon.innerHTML = `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"></path></svg>`;
+            }
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.classList.add('hidden'), 300);
+            }, 5000);
+        }
+    </script>
+
+    <!-- Modale Conferma Eliminazione Spesa -->
+    <div id="confirm-delete-expense-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+        <div class="fixed inset-0 bg-black bg-opacity-60 opacity-0 modal-backdrop" onclick="closeModal('confirm-delete-expense-modal')"></div>
+        <div class="bg-gray-800 rounded-2xl shadow-xl w-full max-w-md p-6 transform scale-95 opacity-0 modal-content text-center">
+            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-900">
+                <svg class="h-6 w-6 text-red-400" stroke="currentColor" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <h3 class="text-lg leading-6 font-bold text-white mt-4">Eliminare Spesa di Gruppo?</h3>
+            <p class="mt-2 text-sm text-gray-400">Questa azione è irreversibile. L'importo pagato verrà rimborsato sul conto dell'utente che ha effettuato il pagamento.</p>
+            <div class="mt-8 flex justify-center space-x-4">
+                <button id="confirm-delete-expense-btn" type="button" class="bg-danger hover:bg-red-700 text-white font-semibold py-2 px-5 rounded-lg">Elimina</button>
+                <button type="button" onclick="closeModal('confirm-delete-expense-modal')" class="bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold py-2 px-5 rounded-lg">Annulla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale per Note Spesa di Gruppo -->
+    <div id="expense-note-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+        <div class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop" onclick="closeModal('expense-note-modal')"></div>
+        <div class="bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg p-6 transform scale-95 opacity-0 modal-content">
+            <h2 class="text-2xl font-bold text-white mb-4">Nota della Spesa</h2>
+            <form id="expense-note-form">
+                <input type="hidden" id="expense-note-expense-id" name="expense_id">
+                <textarea id="expense-note-content" name="note_content" rows="6" class="w-full bg-gray-700 text-white rounded-lg px-3 py-2" placeholder="Scrivi qui la tua nota..."></textarea>
+                <div class="mt-6 flex justify-end space-x-4">
+                    <button type="button" onclick="closeModal('expense-note-modal')" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-5 rounded-lg">Annulla</button>
+                    <button type="submit" class="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-5 rounded-lg">Salva Nota</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openExpenseNoteModal(expenseId) {
+            document.getElementById('expense-note-expense-id').value = expenseId;
+            const noteContentTextarea = document.getElementById('expense-note-content');
+            noteContentTextarea.value = 'Caricamento...';
+
+            fetch(`ajax_group_expense_note_handler.php?action=get_note&expense_id=${expenseId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        noteContentTextarea.value = data.content;
+                    } else {
+                        noteContentTextarea.value = '';
+                        showToast(data.message || 'Impossibile caricare la nota.', 'error');
+                    }
+                })
+                .catch(() => {
+                    noteContentTextarea.value = '';
+                    showToast('Errore di rete nel caricare la nota.', 'error');
+                });
+
+            openModal('expense-note-modal');
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const noteForm = document.getElementById('expense-note-form');
+            if (noteForm) {
+                noteForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const expenseId = document.getElementById('expense-note-expense-id').value;
+                    const noteContent = document.getElementById('expense-note-content').value;
+                    const formData = new FormData();
+                    formData.append('action', 'save_note');
+                    formData.append('expense_id', expenseId);
+                    formData.append('note_content', noteContent);
+
+                    fetch('ajax_group_expense_note_handler.php', { method: 'POST', body: formData })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                showToast(data.message || 'Nota salvata.');
+                                closeModal('expense-note-modal');
+                            } else {
+                                showToast(data.message || 'Errore.', 'error');
+                            }
+                        })
+                        .catch(() => showToast('Errore di rete.', 'error'));
+                });
             }
         });
     </script>

@@ -6,7 +6,7 @@
 <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-gray-800 p-4 flex flex-col justify-between transform -translate-x-full lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out z-40">
     <div style="overflow-y: scroll;">
         <div class="flex items-center mb-10">
-            <div class="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center font-bold text-xl">B</div>
+            <img src="assets/images/logo.png" alt="Logo" class="w-10 h-10 rounded-full">
             <span class="ml-3 text-2xl font-extrabold text-white">Bearget</span>
         </div>
         <nav class="space-y-2" style="height: fit-content;">
